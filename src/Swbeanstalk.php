@@ -22,6 +22,10 @@ class Swbeanstalk {
 
 	public $debug = false;
 
+	protected $using = 'default';
+
+	protected $watching = ['default' => true];
+
 	/**
 	 * Swbeanstalk constructor.
 	 *
@@ -59,25 +63,32 @@ class Swbeanstalk {
 		$this->send(sprintf("put %d %d %d %d\r\n%s", $pri, $delay, $ttr, strlen($data), $data));
 		$res = $this->recv();
 
-		if ($res['status'] == 'INSERTED') {
+		if ($res['status'] === 'INSERTED') {
 			return $res['meta'][0];
-		} else {
-			$this->setError($res['status']);
-			return false;
 		}
-	}
+
+        $this->setError($res['status']);
+        return false;
+    }
 
 	public function useTube($tube)
 	{
+	    // we should not have to do anything here
+	    if ($tube === $this->using) {
+	        return true;
+        }
+
 		$this->send(sprintf("use %s", $tube));
 		$ret = $this->recv();
-		if ($ret['status'] == 'USING' && $ret['meta'][0] == $tube) {
+		if ($ret['status'] === 'USING' && $ret['meta'][0] === $tube) {
+
+		    $this->using = $tube;
 			return true;
-		} else {
-			$this->setError($ret['status'], "Use tube $tube failed.");
-			return false;
 		}
-	}
+
+        $this->setError($ret['status'], "Use tube $tube failed.");
+        return false;
+    }
 
 	public function reserve($timeout=null)
 	{
@@ -89,17 +100,17 @@ class Swbeanstalk {
 		
 		$res = $this->recv();
 
-		if ($res['status'] == 'RESERVED') {
+		if ($res['status'] === 'RESERVED') {
 			list($id, $bytes) = $res['meta'];
 			return [
 				'id' => $id,
 				'body' => substr($res['body'], 0, $bytes)
 			];
-		} else {
-			$this->setError($res['status']);
-			return false;
 		}
-	}
+
+        $this->setError($res['status']);
+        return false;
+    }
 
 	public function delete($id)
 	{
@@ -123,20 +134,30 @@ class Swbeanstalk {
 
 	public function watch($tube)
 	{
+        if (isset($this->watching[$tube])) {
+            return true;
+        }
+
 		$this->send(sprintf('watch %s', $tube));
 		$res = $this->recv();
 
-		if ($res['status'] == 'WATCHING') {
+		if ($res['status'] === 'WATCHING') {
+		    $this->watching[$tube] = true;
 			return $res['meta'][0];
-		} else {
-			$this->setError($res['status']);
-			return false;
 		}
-	}
+
+        $this->setError($res['status']);
+        return false;
+    }
 
 	public function ignore($tube)
 	{
-		return $this->sendv(sprintf('ignore %s', $tube), 'WATCHING');
+        if (isset($this->watching[$tube])) {
+            unset($this->watching[$tube]);
+            return $this->sendv(sprintf('ignore %s', $tube), 'WATCHING');
+        }
+
+        return false;
 	}
 
 	public function peek($id)
@@ -167,30 +188,30 @@ class Swbeanstalk {
 	{
 		$res = $this->recv();
 
-		if ($res['status'] == 'FOUND') {
+		if ($res['status'] === 'FOUND') {
 			list($id, $bytes) = $res['meta'];
 			return [
 				'id' => $id,
 				'body' => substr($res['body'], 0, $bytes)
 			];
-		} else {
-			$this->setError($res['status']);
-			return false;
 		}
-	}
+
+        $this->setError($res['status']);
+        return false;
+    }
 
 	public function kick($bound)
 	{
 		$this->send(sprintf('kick %d', $bound));
 		$res = $this->recv();
 
-		if ($res['status'] == 'KICKED') {
+		if ($res['status'] === 'KICKED') {
 			return $res['meta'][0];
-		} else {
-			$this->setError($res['status']);
-			return false;
 		}
-	}
+
+        $this->setError($res['status']);
+        return false;
+    }
 
 	public function kickJob($id)
 	{
@@ -225,13 +246,13 @@ class Swbeanstalk {
 	{
 		$this->send('list-tube-used');
 		$res = $this->recv();
-		if ($res['status'] == 'USING') {
+		if ($res['status'] === 'USING') {
 			return $res['meta'][0];
-		} else {
-			$this->setError($res['status']);
-			return false;
 		}
-	}
+
+        $this->setError($res['status']);
+        return false;
+    }
 
 	public function listTubesWatched()
 	{
@@ -243,7 +264,7 @@ class Swbeanstalk {
 	{
 		$res = $this->recv();
 
-		if ($res['status'] == 'OK') {
+		if ($res['status'] === 'OK') {
 			list($bytes) = $res['meta'];
 			$body = trim($res['body']);
 		
@@ -251,7 +272,7 @@ class Swbeanstalk {
 			$result = [];
 
 			foreach ($data as $row) {
-				if ($row{0} == '-') {
+				if ($row{0} === '-') {
 					$value = substr($row, 2);
 					$key = null;
 				} else {
@@ -265,15 +286,15 @@ class Swbeanstalk {
 				isset($key) ? $result[$key] = $value : array_push($result, $value);
 			}
 			return $result;
-		} else {
-			$this->setError($res['status']);
-			return false;
 		}
-	}
+
+        $this->setError($res['status']);
+        return false;
+    }
 
 	public function pauseTube($tube, $delay)
 	{
-		return $this->sendv(sprintf('pause-tube %s %d', $tube, $delay));
+		return $this->sendv(sprintf('pause-tube %s %d', $tube, $delay), 'PAUSED');
 	}
 
 	protected function sendv($cmd, $status)
@@ -281,7 +302,7 @@ class Swbeanstalk {
 		$this->send($cmd);
 		$res = $this->recv();
 
-		if ($res['status'] != $status) {
+		if ($res['status'] !== $status) {
 			$this->setError($res['status']);
 			return false;
 		}
@@ -328,10 +349,9 @@ class Swbeanstalk {
 
 	public function disconnect()
 	{
-		if ($this->connected) {
+		if ($this->isConnected()) {
 			$this->send('quit');
 			$this->connection->close();
-			$this->connected = false;
 		}
 
 		if ($this->connection) {
