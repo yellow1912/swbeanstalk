@@ -250,7 +250,7 @@ class Swbeanstalk
             $res = $this->recv();
             if ($res['status'] === 'USING') {
                 $this->using = $res['meta'][0];
-
+            } else {
                 $this->setError($res['status']);
                 return false;
             }
@@ -283,7 +283,7 @@ class Swbeanstalk
             $result = [];
 
             foreach ($data as $row) {
-                if ($row{0} === '-') {
+                if ('-' === $row[0]) {
                     $value = substr($row, 2);
                     $key = null;
                 } else {
