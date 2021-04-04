@@ -259,6 +259,23 @@ class Swbeanstalk
         return $this->using;
     }
 
+    /**
+     * @param string $tube The tube to use during execution
+     * @param \Closure $closure Closure to execute while using the specified tube
+     * @return mixed the return value of the closure.
+     * @internal This is marked as internal since it is not part of a stabilized interface.
+     */
+    public function withUsedTube(string $tube, \Closure $closure)
+    {
+        $used = $this->listTubeUsed();
+        try {
+            $this->useTube($tube);
+            return $closure($this);
+        } finally {
+            $this->useTube($used);
+        }
+    }
+
     public function listTubesWatched(bool $askServer = false)
     {
         if ($askServer) {
@@ -269,6 +286,44 @@ class Swbeanstalk
         }
 
         return array_keys($this->watching);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function watchOnly(string $tube)
+    {
+        $this->watch($tube);
+
+        $ignoreTubes = array_diff_key($this->watching, [$tube => true]);
+        foreach ($ignoreTubes as $ignoreTube => $true) {
+            $this->ignore($ignoreTube);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @param string $tube The tube to watch during execution
+     * @param \Closure $closure Closure to execute while using the specified tube
+     * @return mixed the return value of the closure.
+     * @internal This is marked as internal since it is not part of a stabilized interface.
+     */
+    public function withWatchedTube(string $tube, \Closure $closure)
+    {
+        $watched = $this->listTubesWatched();
+        try {
+            $this->watchOnly($tube);
+            return $closure($this);
+        } finally {
+            foreach ($watched as $watchedTupe) {
+                $this->watch($watchedTupe);
+            }
+
+            if (!in_array($tube, $watched, true)) {
+                $this->ignore($tube);
+            }
+        }
     }
 
     protected function statsRead()
