@@ -13,7 +13,6 @@ use Swoole\Coroutine\Client;
  */
 class Swbeanstalk
 {
-
     const DEFAULT_PRI = 60;
     const DEFAULT_TTR = 30;
 
@@ -72,7 +71,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function useTube(string $tube)
+    public function useTube(string $tube): bool
     {
         // we should not have to do anything here
         if ($tube === $this->using) {
@@ -91,7 +90,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function reserve(int $timeout = null)
+    public function reserve(?int $timeout = null)
     {
         if (isset($timeout)) {
             $this->send(sprintf('reserve-with-timeout %d', $timeout));
@@ -102,7 +101,7 @@ class Swbeanstalk
         $res = $this->recv();
 
         if ($res['status'] === 'RESERVED') {
-            list($id, $bytes) = $res['meta'];
+            [$id, $bytes] = $res['meta'];
             return [
                 'id' => $id,
                 'body' => substr($res['body'], 0, $bytes)
@@ -113,22 +112,22 @@ class Swbeanstalk
         return false;
     }
 
-    public function delete(int $id)
+    public function delete(int $id): bool
     {
         return $this->sendv(sprintf('delete %d', $id), 'DELETED');
     }
 
-    public function release(int $id, int $pri = self::DEFAULT_PRI, $delay = 0)
+    public function release(int $id, int $pri = self::DEFAULT_PRI, $delay = 0): bool
     {
         return $this->sendv(sprintf('release %d %d %d', $id, $pri, $delay), 'RELEASED');
     }
 
-    public function bury(int $id, int $pri = self::DEFAULT_PRI)
+    public function bury(int $id, int $pri = self::DEFAULT_PRI): bool
     {
         return $this->sendv(sprintf('bury %d %d', $id, $pri), 'BURIED');
     }
 
-    public function touch(int $id)
+    public function touch(int $id): bool
     {
         return $this->sendv(sprintf('touch %d', $id), 'TOUCHED');
     }
@@ -151,7 +150,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function ignore(string $tube)
+    public function ignore(string $tube): bool
     {
         if (isset($this->watching[$tube])) {
             unset($this->watching[$tube]);
@@ -214,7 +213,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function kickJob(int $id)
+    public function kickJob(int $id): bool
     {
         return $this->sendv(sprintf('kick-job %d', $id), 'KICKED');
     }
@@ -276,7 +275,7 @@ class Swbeanstalk
         }
     }
 
-    public function listTubesWatched(bool $askServer = false)
+    public function listTubesWatched(bool $askServer = false): array
     {
         if ($askServer) {
             $this->send('list-tubes-watched');
@@ -358,12 +357,12 @@ class Swbeanstalk
         return false;
     }
 
-    public function pauseTube(string $tube, int $delay)
+    public function pauseTube(string $tube, int $delay): bool
     {
         return $this->sendv(sprintf('pause-tube %s %d', $tube, $delay), 'PAUSED');
     }
 
-    protected function sendv(string $cmd, string $status)
+    protected function sendv(string $cmd, string $status): bool
     {
         $this->send($cmd);
         $res = $this->recv();
@@ -391,7 +390,7 @@ class Swbeanstalk
         return $this->connection->send($cmd);
     }
 
-    protected function recv()
+    protected function recv(): array
     {
         if (!$this->isConnected()) {
             throw new \RuntimeException('No connection found while reading data from socket.');
