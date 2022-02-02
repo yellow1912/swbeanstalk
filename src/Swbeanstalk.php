@@ -59,7 +59,7 @@ class Swbeanstalk
         return $this->connection && $this->connection->isConnected();
     }
 
-    public function put($data, $pri = self::DEFAULT_PRI, $delay = 0, $ttr = self::DEFAULT_TTR)
+    public function put($data, int $pri = self::DEFAULT_PRI, int $delay = 0, int $ttr = self::DEFAULT_TTR)
     {
         $this->send(sprintf("put %d %d %d %d\r\n%s", $pri, $delay, $ttr, strlen($data), $data));
         $res = $this->recv();
@@ -72,7 +72,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function useTube($tube)
+    public function useTube(string $tube)
     {
         // we should not have to do anything here
         if ($tube === $this->using) {
@@ -91,7 +91,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function reserve($timeout = null)
+    public function reserve(int $timeout = null)
     {
         if (isset($timeout)) {
             $this->send(sprintf('reserve-with-timeout %d', $timeout));
@@ -113,27 +113,27 @@ class Swbeanstalk
         return false;
     }
 
-    public function delete($id)
+    public function delete(int $id)
     {
         return $this->sendv(sprintf('delete %d', $id), 'DELETED');
     }
 
-    public function release($id, $pri = self::DEFAULT_PRI, $delay = 0)
+    public function release(int $id, int $pri = self::DEFAULT_PRI, $delay = 0)
     {
         return $this->sendv(sprintf('release %d %d %d', $id, $pri, $delay), 'RELEASED');
     }
 
-    public function bury($id)
+    public function bury(int $id, int $pri = self::DEFAULT_PRI)
     {
-        return $this->sendv(sprintf('bury %d', $id), 'BURIED');
+        return $this->sendv(sprintf('bury %d %d', $id, $pri), 'BURIED');
     }
 
-    public function touch($id)
+    public function touch(int $id)
     {
         return $this->sendv(sprintf('touch %d', $id), 'TOUCHED');
     }
 
-    public function watch($tube)
+    public function watch(string $tube)
     {
         if (isset($this->watching[$tube])) {
             return true;
@@ -151,7 +151,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function ignore($tube)
+    public function ignore(string $tube)
     {
         if (isset($this->watching[$tube])) {
             unset($this->watching[$tube]);
@@ -161,7 +161,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function peek($id)
+    public function peek(int $id)
     {
         $this->send(sprintf('peek %d', $id));
         return $this->peekRead();
@@ -201,7 +201,7 @@ class Swbeanstalk
         return false;
     }
 
-    public function kick($bound)
+    public function kick(int $bound)
     {
         $this->send(sprintf('kick %d', $bound));
         $res = $this->recv();
@@ -214,18 +214,18 @@ class Swbeanstalk
         return false;
     }
 
-    public function kickJob($id)
+    public function kickJob(int $id)
     {
         return $this->sendv(sprintf('kick-job %d', $id), 'KICKED');
     }
 
-    public function statsJob($id)
+    public function statsJob(int $id)
     {
         $this->send(sprintf('stats-job %d', $id));
         return $this->statsRead();
     }
 
-    public function statsTube($tube)
+    public function statsTube(string $tube)
     {
         $this->send(sprintf('stats-tube %s', $tube));
         return $this->statsRead();
@@ -358,12 +358,12 @@ class Swbeanstalk
         return false;
     }
 
-    public function pauseTube($tube, $delay)
+    public function pauseTube(string $tube, int $delay)
     {
         return $this->sendv(sprintf('pause-tube %s %d', $tube, $delay), 'PAUSED');
     }
 
-    protected function sendv($cmd, $status)
+    protected function sendv(string $cmd, string $status)
     {
         $this->send($cmd);
         $res = $this->recv();
@@ -376,7 +376,7 @@ class Swbeanstalk
         return true;
     }
 
-    protected function send($cmd)
+    protected function send(string $cmd)
     {
         if (!$this->isConnected()) {
             throw new \RuntimeException('No connecting found while writing data to socket.');
@@ -425,7 +425,7 @@ class Swbeanstalk
         }
     }
 
-    protected function setError($status, $msg = '')
+    protected function setError(string $status, string $msg = '')
     {
         $this->lastError = compact('status', 'msg');
     }
@@ -440,11 +440,9 @@ class Swbeanstalk
         return null;
     }
 
-    protected function wrap($output, $out)
+    protected function wrap(string $output, bool $out)
     {
         $line = $out ? '----->>' : '<<-----';
         echo "\r\n$line\r\n$output\r\n$line\r\n";
     }
-
 }
-
